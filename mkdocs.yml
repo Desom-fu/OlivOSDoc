@@ -76,6 +76,7 @@ nav:
       - 插件模板: DevPlugin/Template.md
       - 框架事件: DevPlugin/Event.md
       - 插件接口: DevPlugin/API.md
+      - 消息格式: DevPlugin/Message.md
       - 用户模块接口: DevPlugin/UserModule.md
       - 开发技巧: DevPlugin/Note.md
     - 开发指引:
