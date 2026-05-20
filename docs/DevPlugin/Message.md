@@ -95,6 +95,12 @@ OlivOS 消息段是 OlivOS 内部用于消息格式转换以及交换的复杂�
 }
 ```
 
+以上消息最终将被渲染为
+> @仑质 哼哼哼啊啊啊啊啊啊
+
+> ![张口闭眼男.gif](img/senpai.png)
+
+
 ### 转义
 
 OP 码和 CQ 码由字符 `[` 起始, 以 `]` 结束, 并且以 `,` 分割各个参数, 如果你的 CQ 码中, 参数值包括了这些字符, 那么它们应该被使用 HTML 特殊字符的编码方式进行转义.
@@ -209,7 +215,7 @@ Type : `image`
 
 发送时，`file` 参数支持：
 
-- 绝对路径，例如 `file:///C:\\Users\Alice\Pictures\1.png`，格式使用 [`file` URI](https://tools.ietf.org/html/rfc8089)
+- 绝对路径，例如 `file:///C:\\Users\Alice\Pictures\1.png`，格式使用 [file URI](https://tools.ietf.org/html/rfc8089)
 - 网络 URL，例如 `https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png`
 - Base64 编码，例如 `base64://iVBORw0KGgoAAAANSUhEUgAAABQAAAAVCAIAAADJt1n/AAAAKElEQVQ4EWPk5+RmIBcwkasRpG9UM4mhNxpgowFGMARGEwnBIEJVAAAdBgBNAZf+QAAAAABJRU5ErkJggg==`
 
@@ -265,7 +271,7 @@ Type : `reply`
 | `proxy` |  | ✓ | `0` `1` | 只在通过网络 URL 发送时有效, 表示是否通过代理下载文件 ( 需通过环境变量或配置文件配置代理 ) , 默认 `1` |
 | `timeout` |  | ✓ | - | 只在通过网络 URL 发送时有效, 单位秒, 表示下载网络文件的超时时间 , 默认不超时|
 
-[1] 发送时, `file` 参数除了支持使用收到的语音文件名直接发送外, 还支持其它形式, 参考 [图片](#图片)。
+[1] 发送时, `file` 参数除了支持使用收到的语音文件名直接发送外, 还支持其它形式, 参考 [图片](#_6)。
 
 ### 短视频
 
