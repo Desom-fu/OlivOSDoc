@@ -1160,7 +1160,7 @@ plugin_event.indeAPI.create_message(chat_type, chat_id, content_type, content)
 | 内容 | 解释 |
 |:--:|:--:|
 | group | 频道消息 |
-| private | 频道私聊消息 |
+| private | 私聊消息 |
 
 - content_type
 
@@ -1178,7 +1178,7 @@ plugin_event.indeAPI.create_message(chat_type, chat_id, content_type, content)
 |:--:|:--:|:---|:--:|
 | chat_type | str | 发送目标的类型 | None |
 | chat_id | str | 发送目标的ID | None |
-| content_type | str | 实际使用的消息类型 | None |
+| content_type | int | 实际使用的消息类型 | None |
 | content | str | 发送的内容 | None |
 
 #### 举例
