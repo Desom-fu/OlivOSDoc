@@ -194,6 +194,42 @@ window.addEventListener('message', (event) => {
 
 浏览器**刷新会销毁全部保活页面**，只按当前停留的插件页面重建一个；这是最彻底的手工回收方式。
 
+## OPK 打包与静态资源
+
+`.opk` 是重命名过的 zip，宿主会把它解包到 `plugin/tmp/<namespace>/` 之后再导入，而 `plugin/tmp` 属于临时目录、随时可能被清理。因此页面偶尔 404 是正常的可能出现的情况，**推荐在插件里做一层兜底**：
+
+````python
+from pathlib import Path
+
+_WEBUI_ENTRY = Path(__file__).resolve().parent / 'webui' / 'index.html'
+# 模块导入这一刻文件一定还在，先读进内存
+_WEBUI_DOCUMENT = _WEBUI_ENTRY.read_bytes()
+
+
+def restore_webui(Proc):
+    root = getattr(Proc, 'plugin_models_dict', {}).get('<namespace>', {}).get('webui_root')
+    if not isinstance(root, str) or not root:
+        return
+    entry = Path(root) / 'webui' / 'index.html'
+    if entry.is_file():
+        return
+    try:
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.write_bytes(_WEBUI_DOCUMENT)
+    except OSError as exc:
+        Proc.log(4, '恢复 WebUI 页面失败: {}'.format(exc))
+````
+
+要点：
+
+- **在模块导入时**把页面读进内存 —— 只有这个时刻能保证解包目录里的文件还在。
+- **在 `init_after` 里**检查磁盘、缺失就写回。路径取自 `Proc.plugin_models_dict[<namespace>]['webui_root']`，与宿主已注册的 `/plugin/<namespace>/` 路由完全一致。
+- **不要用文件锁去阻止宿主清理**。占用文件会让宿主的目录清理中途抛 `PermissionError`，留下一个删了一半的残缺目录，反而更容易 404。
+- 有多个静态文件（CSS、JS、图片）时应遍历整个 `webui/` 目录建立快照，而不是只处理 `index.html`。
+- 直接以文件夹形式部署到 `plugin/app/<namespace>/` 时不涉及临时目录，这段逻辑会自然保持静默。
+
+打包时也务必确认 `webui/` 真的进了 `.opk` —— 部分打包脚本会误把子目录整体排除掉。
+
 ## 常见问题
 
 | 现象 | 检查项 |
