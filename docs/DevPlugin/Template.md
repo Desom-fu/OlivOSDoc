@@ -112,7 +112,7 @@ OlivOS插件通过`importlib`进行动态加载，加载后将具有与OlivOS同
 |:--:|:--:|:---|
 | title | string | 页面导航标题 |
 | type | string | `iframe` 为插件内置页面，`link` 为在新标签页打开的外部链接 |
-| path | string | `iframe` 必填，相对插件根目录，必须以 `webui/` 开头，如 `webui/index.html` |
+| path | string | `iframe` 必填，相对插件根目录，使用 `/` 分隔，不允许绝对路径或 `..`；例如 `webui/index.html` |
 | url | string | `link` 必填，只接受 `http://` 或 `https://` URL |
 
 宿主会自动补全所属插件的 `namespace`。修改注册表后需重载插件。页面并不会由核心自动生成，插件应自行提供 HTML、样式与交互逻辑。
