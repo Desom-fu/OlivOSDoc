@@ -6,13 +6,18 @@
 
 ## 目录与注册
 
+**本地插件页面及其随包提供的静态资源必须放在插件根目录的 `webui/` 内。** `webui/` 与 `app.json` 同级，可以包含子目录。宿主的插件页面路由只提供这个目录中的文件；放在插件根目录或与 `webui/` 同级的 `assets/`、`static/` 中，即使打进 OPK，也无法通过该路由访问。此要求同时适用于文件夹和 OPK 部署。
+
 ```text
 OlivOSPluginTemplate/
 ├── app.json
 ├── __init__.py
 ├── main.py
 └── webui/
-    └── index.html
+    ├── index.html
+    └── assets/
+        ├── app.js
+        └── style.css
 ```
 
 在 `app.json` 中添加以下字段，保留插件原有的其他字段。文件必须是 **UTF-8 无 BOM**。
@@ -34,7 +39,7 @@ OlivOSPluginTemplate/
 | webui_config | 可选列表，允许注册多个页面 |
 | title | 必填字符串，在侧栏“插件页面”中显示 |
 | type | `iframe` 或 `link` |
-| path | `iframe` 必填，使用 `/` 分隔的相对路径，以 `webui/` 开头，不含 `..` |
+| path | `iframe` 必填，相对于插件根目录，**必须以 `webui/` 开头**，使用 `/` 分隔，不含 `..`；例如 `webui/index.html` 或 `webui/pages/settings.html` |
 | url | `link` 必填，使用 `http://` 或 `https://` 地址 |
 
 例如，也可以在列表中添加 `{"title": "文档", "type": "link", "url": "https://docs.olivos.run/"}`，在新标签页打开外部网站。外部链接不会获得内嵌插件页面的消息桥接能力。
@@ -42,6 +47,16 @@ OlivOSPluginTemplate/
 宿主从插件元数据补全 `namespace`，页面无需自行填写。修改 `app.json` 后需重载插件。源码插件放在 `plugin/app/` 下，`.opk` 插件的网页由核心从解包目录 `plugin/tmp/` 下挂载。
 
 注册后的本地入口为 `/plugin/<namespace>/index.html`；其他相对路径也只允许访问本插件 `webui/` 内的文件。访问需要已经登录 WebUI。应从侧栏入口打开页面：单独打开文件或直接访问这个地址不会提供宿主的消息转发桥。
+
+注意区分包内路径、注册路径与浏览器 URL：
+
+| 包内文件（相对于插件根目录） | `webui_config` 中的 `path` | 浏览器 URL |
+| --- | --- | --- |
+| `webui/index.html` | `webui/index.html` | `/plugin/<namespace>/index.html` |
+| `webui/pages/settings.html` | `webui/pages/settings.html` | `/plugin/<namespace>/pages/settings.html` |
+| `webui/assets/app.js` | 静态资源无需单独注册 | `/plugin/<namespace>/assets/app.js` |
+
+例如，`webui/index.html` 引用脚本应写 `src="./assets/app.js"`，引用样式写 `href="./assets/style.css"`；`webui/pages/settings.html` 引用同一脚本则写 `src="../assets/app.js"`。浏览器 URL 中不再包含包内的 `webui/` 这一层，不要重复写成 `src="webui/assets/app.js"`。网页资源引用可以在 `webui/` 内按相对位置查找，但不能越出该目录；这与注册字段 `path` 禁止包含 `..` 是两个不同的规则。
 
 ## 网页发送请求
 
@@ -196,51 +211,22 @@ window.addEventListener('message', (event) => {
 
 ## OPK 打包与静态资源
 
-`.opk` 是重命名过的 zip，宿主会把它解包到 `plugin/tmp/<namespace>/` 之后再导入，而 `plugin/tmp` 属于临时目录、随时可能被清理。因此页面偶尔 404 是正常的可能出现的情况，**推荐在插件里做一层兜底**：
+`.opk` 是将插件目录内的文件压缩为 ZIP 后改后缀得到的包，包根目录应直接包含 `app.json`、`__init__.py` 和 `webui/`，不要再套一层插件目录。
 
-````python
-from pathlib import Path
+**打包时必须完整包含 `webui/` 及页面用到的所有静态资源，且这些资源都应位于 `webui/` 内。** 例如 `webui/assets/app.js` 有效，包根目录下的 `assets/app.js` 不会被插件页面路由提供，也不在 OPK 网页资源的保留范围内。
 
-_WEBUI_ENTRY = Path(__file__).resolve().parent / 'webui' / 'index.html'
-# 模块导入这一刻文件一定还在，先读进内存
-_WEBUI_DOCUMENT = _WEBUI_ENTRY.read_bytes()
+宿主将 OPK 解包，并按 `app.json` 中的 `namespace` 整理到 `plugin/tmp/<namespace>/`，再导入插件。即使 OPK 放在 `plugin/app/` 的子目录中，或包名与命名空间不同，网页挂载也应使用这个最终目录。
 
+**网页资源的生命周期由宿主管理。** 对成功加载且声明了 `webui_config` 列表的 OPK 插件，宿主清理导入缓存时保留整个 `webui/` 目录，包括 HTML、CSS、JavaScript、图片及子目录；其他导入缓存按原流程清理。下一次加载时重新从 OPK 提取资源，包内已删除的旧资源不会继续保留。
 
-def restore_webui(Proc):
-    root = getattr(Proc, 'plugin_models_dict', {}).get('<namespace>', {}).get('webui_root')
-    if not isinstance(root, str) or not root:
-        return
-    entry = Path(root) / 'webui' / 'index.html'
-    if entry.is_file():
-        return
-    try:
-        entry.parent.mkdir(parents=True, exist_ok=True)
-        entry.write_bytes(_WEBUI_DOCUMENT)
-    except OSError as exc:
-        Proc.log(4, '恢复 WebUI 页面失败: {}'.format(exc))
-````
+`plugin/tmp/` 仍是可重建的缓存，不应用来保存用户配置或业务数据。源码文件夹插件的网页直接从自身的 `webui/` 读取。
 
-要点：
+### 旧版宿主兼容
 
-- **在模块导入时**把页面读进内存 —— 只有这个时刻能保证解包目录里的文件还在。这一步可以用 `__file__` 定位。
-- **写回时的路径必须取自 `Proc.plugin_models_dict[<namespace>]['webui_root']`**，它与宿主已注册的 `/plugin/<namespace>/` 路由**完全一致**。
-- **不要用文件锁去阻止宿主清理**。占用文件会让宿主的目录清理中途抛 `PermissionError`，留下一个删了一半的残缺目录，反而更容易 404。
-- 有多个静态文件（CSS、JS、图片）时应遍历整个 `webui/` 目录建立快照，而不是只处理 `index.html`。
-- 直接以文件夹形式部署到 `plugin/app/<namespace>/` 时不涉及临时目录，这段逻辑会自然保持静默。
+未包含此修复的宿主会在导入 OPK 后删除整个解包目录，导致已注册的页面返回 404；对子目录中的 OPK，还可能记录移动前的旧挂载路径。这属于宿主的资源清理与路径登记缺陷，优先更新 OlivOS 核心。404 不是正常的打包行为，也不能仅凭使用了 `__file__` 就判定插件错误。
 
-### ⚠️ 最容易踩的错：用 `__file__` 推算写回路径
+必须兼容旧版时，插件可在模块导入时用 `__file__` 定位并缓存全部网页资源，再在 `init_after` 根据 `Proc.plugin_models_dict[<namespace>]['webui_root']` 恢复到旧宿主实际登记的路径；这是兼容方案，不是开发 WebUI 的必需步骤。写回时应允许目标目录已不存在，并处理文件读写异常。模块导入阶段没有事件回调的 `Proc` 参数，不能直接引用它。
 
-**读入内存**用 `__file__` 没问题，但**写回**时若用 `os.path.dirname(os.path.abspath(__file__))` 来推算目标目录，在 **`.opk` 部署下必然 404**：
-
-- OPK 的解包目录由宿主管理，可能被清理、也可能因命名空间标准化被改名 —— 这时 `__file__` 推出来的路径**和宿主实际注册的路由对不上**，文件写回了没人读的地方。
-- 更麻烦的是：**文件夹模式下两者恰好相同**（都是 `plugin/app/<namespace>/`），于是在文件夹部署时一切正常，一旦打包成 `.opk` 就失效 —— 极易被误判成「宿主的问题」。
-
-判断方法很简单：**只要写回路径不是从 `webui_root` 取的，就是错的。**
-
-打包时还要确认：
-
-- `webui/` 真的进了 `.opk` —— 部分打包脚本会误把子目录整体排除掉。
-- 不要把打包产物自己打进去：`*.opk`，以及 `X.opk.bak-*` 这类备份（**它们不以 `.opk` 结尾，很容易漏掉**），否则包体会异常膨胀。
 
 ## 常见问题
 
@@ -248,7 +234,7 @@ def restore_webui(Proc):
 | --- | --- |
 | 侧栏没有插件入口 | 插件是否加载成功；`webui_config` 是否为列表；`type`、`title`、`path` 是否有效；修改后是否重载 |
 | 页面 401 | 浏览器是否已登录、会话是否失效；重新登录后从侧栏打开 |
-| 页面 404 | `.opk` 是否包含 `webui/`；注册路径、文件名和大小写是否一致 |
+| 页面 404 | `.opk` 包根目录是否包含 `webui/`；注册路径、文件名和大小写是否一致；仅 OPK 失败时检查宿主是否包含静态资源保留与最终挂载路径修复 |
 | 页面可见但请求超时 | 是否从宿主侧栏打开；事件名和命名空间是否一致；插件是否回包；请求 ID 是否匹配 |
 | 普通菜单报属性错误 | 使用 `getattr` 检查 `webui` 和 `payload`，不要假定每个菜单事件都来自网页 |
 | 原生 GUI 菜单不能用 | 原生 GUI 不会自动变成网页，需要自行编写页面和 Python 处理逻辑 |
