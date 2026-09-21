@@ -51,7 +51,7 @@ ssh -L 20480:127.0.0.1:20480 user@server
 
 WebUI 默认启用，不需要在 `conf/config.json` 中预置 `OlivOS_webUI`。组件定义及默认参数内置于核心 `OlivOS/core/boot/bootDataAPI.py`，服务端也会补齐未指定的参数。
 
-`conf/config.json` 仅用于用户主动设置的覆盖项，随项目提供的文件不重复写入这组默认值。正常使用无需修改；只有需要更换端口、监听地址或关闭 WebUI 时，才按核心的配置覆盖机制修改 `models.OlivOS_webUI` 下对应的用户设置，并重启 OlivOS 生效。
+`conf/config.json` 仅用于用户主动设置的覆盖项，随项目提供的文件不重复写入这组默认值。正常使用无需修改；只有需要更换端口、监听地址或关闭 WebUI 时，才按核心的配置覆盖机制修改 `models.OlivOS_webUI` 下对应的用户设置，并重启 OlivOS 生效。部署脚本也可以使用环境变量设置监听地址和端口。
 
 | 内置字段 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -62,6 +62,8 @@ WebUI 默认启用，不需要在 `conf/config.json` 中预置 `OlivOS_webUI`。
 | server.static_path | `./data/webui/static` | 核心静态资源释放目录，启动时由内嵌资源更新 |
 | server.buffer_limit | `500` | 每个日志级别及全部日志各自的上限，也用于终端和事件缓冲 |
 | server.plugin_page_cache | `10` | 插件页面保活数量上限（1~20），超出时淘汰最久未使用的页面 |
+
+环境变量 `OLIVOS_WEBUI_HOST` 和 `OLIVOS_WEBUI_PORT` 分别覆盖 `server.host` 和 `server.port`，优先级高于 `conf/config.json`，适合容器、启动脚本和临时部署。端口必须是 `0` 至 `65535` 的整数，`0` 表示由操作系统分配可用端口；空地址或无效端口会被忽略并继续使用配置值。启动后以日志和托盘使用的实际监听端口为准，环境变量不会写回配置文件。将地址设为 `0.0.0.0` 或 `::` 会监听所有网卡，只有在网络访问确实需要时才这样设置，并继续保护好 WebUI 令牌。
 
 ### 需要修改时再添加
 
@@ -87,7 +89,13 @@ WebUI 默认启用，不需要在 `conf/config.json` 中预置 `OlivOS_webUI`。
 }
 ```
 
-例如，更换监听端口时修改 `port`；关闭 WebUI 时将 `enable` 改为 `false`。修改后重启 OlivOS。保持默认行为时，可以完全省略 `OlivOS_webUI`，由核心使用内置配置。
+例如，更换监听端口时修改 `port`；关闭 WebUI 时将 `enable` 改为 `false`。修改后重启 OlivOS。保持默认行为时，可以完全省略 `OlivOS_webUI`，由核心使用内置配置。只使用环境变量时，可以不在 `conf/config.json` 中写 `server.host` 和 `server.port`：
+
+```bash
+OLIVOS_WEBUI_HOST=127.0.0.1 OLIVOS_WEBUI_PORT=20480 python main.py
+```
+
+Windows PowerShell 使用 `$env:OLIVOS_WEBUI_HOST = '127.0.0.1'` 和 `$env:OLIVOS_WEBUI_PORT = '20480'` 后再启动 OlivOS。环境变量只控制监听地址和端口，不会关闭 WebUI，也不会改变令牌文件路径。
 
 ## 插件页面
 
