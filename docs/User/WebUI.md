@@ -61,6 +61,7 @@ WebUI 默认启用，不需要在 `conf/config.json` 中预置 `OlivOS_webUI`。
 | server.token_path | `./conf/webui_token.txt` | 认证文件路径，相对 OlivOS 工作目录 |
 | server.static_path | `./data/webui/static` | 核心静态资源释放目录，启动时由内嵌资源更新 |
 | server.buffer_limit | `500` | 每个日志级别及全部日志各自的上限，也用于终端和事件缓冲 |
+| server.plugin_page_cache | `10` | 插件页面保活数量上限（1~20），超出时淘汰最久未使用的页面 |
 
 ### 需要修改时再添加
 
@@ -78,7 +79,8 @@ WebUI 默认启用，不需要在 `conf/config.json` 中预置 `OlivOS_webUI`。
                 "port": 20480,
                 "token_path": "./conf/webui_token.txt",
                 "static_path": "./data/webui/static",
-                "buffer_limit": 500
+                "buffer_limit": 500,
+                "plugin_page_cache": 10
             }
         }
     }
@@ -90,5 +92,7 @@ WebUI 默认启用，不需要在 `conf/config.json` 中预置 `OlivOS_webUI`。
 ## 插件页面
 
 插件作者需要提供网页并注册入口，核心不会把 Python 设置项或原生 GUI 自动转换为网页。普通插件菜单仍能在“插件”页调用；带原生窗口的菜单不一定适合无桌面环境。
+
+插件页面打开后会保持存活：切到日志、终端等其他页面再切回来不会重新加载，页面内的编辑内容与滚动位置都会保留。侧栏每个插件页面条目右侧有一个 `×` 单独关闭它，标题栏“插件页面”右侧的 `×` 一次关闭全部。同时保活的页面数量由 `server.plugin_page_cache` 控制（默认 10），超出后最久未打开的页面会被自动释放；刷新浏览器会清空全部保活页面并只重建当前停留的那一个。
 
 开发入口见 [WebUI 页面开发](../DevPlugin/WebUI.md) 和 [官方插件模板](https://github.com/OlivOS-Team/OlivOSPluginTemplate)。

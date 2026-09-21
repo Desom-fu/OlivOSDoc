@@ -132,15 +132,56 @@ HTML 中需有对应的输出节点，例如 `<output id="reply"></output>`。�
 
 ## 沙箱与资源
 
-本地页面运行在 `sandbox="allow-scripts"` 的 iframe 中，并受到核心的 CSP 限制：
+本地页面运行在带 `sandbox` 的 iframe 中，同时受两套机制约束：iframe 的 `sandbox` 属性与核心下发的 CSP `sandbox` 指令。**浏览器取更严格的那个**，因此它们使用同一份能力列表。
+
+已放行的常规浏览器能力：
+
+| 放行的 token | 对应能力 |
+| --- | --- |
+| `allow-scripts` | 执行 JavaScript |
+| `allow-forms` | 原生表单提交 |
+| `allow-modals` | `alert` / `confirm` / `prompt` |
+| `allow-downloads` | 下载（含 blob 与 `<a download>` 导出） |
+| `allow-popups`、`allow-popups-to-escape-sandbox` | `window.open` 与 `target="_blank"`，且弹窗不继承沙箱 |
+| `allow-pointer-lock`、`allow-orientation-lock`、`allow-presentation` | 指针锁定、屏幕方向锁、投屏 |
+| `allow-top-navigation-by-user-activation` | 用户点击触发的整页跳转 |
+| `allow-storage-access-by-user-activation` | Storage Access API |
+
+刻意**不**放行两个：
 
 - 没有 `allow-same-origin`，网页是独立的 opaque origin。不能访问父页面 DOM、父页面存储或认证数据，也不能依赖 iframe 自己的 `localStorage`。
+- 没有 `allow-top-navigation`，页面不能自行把宿主 WebUI 整页导航走。
+
+其余限制：
+
 - `connect-src 'none'` 禁止网页直接发起 `fetch`、XHR 或 WebSocket 请求。需要读写插件数据时，通过消息桥交给 Python 处理，并在 Python 中校验输入、处理文件或网络异常。
-- 不允许原生表单提交。可以使用 `type="button"` 配合 JavaScript 发消息；模板也支持在输入框按回车发送。
 - 默认不允许外部 CDN 脚本和样式。模板将 HTML、CSS 和 JavaScript 放在同一个可读的 `index.html` 中，避免构建工具和额外资源请求。复杂前端应在实际沙箱中验证模块加载与资源访问。
 - 宿主不会向页面发布 token、session 或专用主题同步事件。页面维护自己的样式；模板使用 `prefers-color-scheme` 适配浏览器提供的深浅配色。
 
+打开外部文档或教程页面时使用 `<a href="..." target="_blank" rel="noopener">`；弹窗脱离沙箱，外部站点按正常源运行。下载应由用户手势触发（点击），不要尝试在页面加载时自动导出。
+
 沙箱消息发送中使用 `'*'`，并不表示向任意窗口广播：消息发给指定的 `window.parent`，回包也发给指定的 iframe 窗口。宿主验证当前 iframe 的 `source` 和 opaque origin，并绑定插件命名空间；页面仍需检查回包来源与请求 ID。
+
+## 页面保活与可见性
+
+打开过的插件页面会**留在 DOM 中保活**：切到日志、终端等其他页面再切回来不会重新加载，表单内容、滚动位置与页面内状态都会保留。
+
+- 保活数量有上限（默认 10 个，见[用户文档的 `server.plugin_page_cache`](../User/WebUI.md#内置默认值与用户配置)），超出时按最久未使用淘汰，被淘汰的页面下次进入会重新加载。
+- 侧栏每个条目右侧的 `×` 只关闭该页面，标题栏的 `×` 一次关闭全部存活页面。
+- **被切走（隐藏）的页面仍在后台运行**，定时器与轮询不会自行停止。宿主会向页面发送可见性通知，页面应据此暂停后台工作：
+
+````js
+window.addEventListener('message', (event) => {
+    if (event.source !== window.parent) return;
+    const data = event.data;
+    if (!data || data.type !== 'olivos:plugin_visibility') return;
+    polling = data.visible;   // false 时暂停轮询，true 时恢复
+});
+````
+
+不处理这条通知也能正常工作，但页面在后台会继续按原节奏发请求，容易造成不必要的平台调用与日志噪音。新建页面加载完成时宿主也会补发一次，因此页面无需自己猜测初始可见性。
+
+浏览器**刷新会销毁全部保活页面**，只按当前停留的插件页面重建一个；这是最彻底的手工回收方式。
 
 ## 常见问题
 
