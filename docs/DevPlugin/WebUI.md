@@ -39,10 +39,36 @@ OlivOSPluginTemplate/
 | webui_config | 可选列表，允许注册多个页面 |
 | title | 必填字符串，在侧栏“插件页面”中显示 |
 | type | `iframe` 或 `link` |
-| path | `iframe` 必填，相对于插件根目录，使用 `/` 分隔；可指向文件（如 `webui/index.html`、`panel.html`），或包含 `index.html` 的目录（如 `webui/`） |
+| path | `iframe` 必填字符串，每个条目只填写一个路径；相对于插件根目录，使用 `/` 分隔，可指向文件（如 `webui/index.html`、`panel.html`）或包含 `index.html` 的目录（如 `webui/`） |
 | url | `link` 必填，使用 `http://` 或 `https://` 地址 |
 
 例如，也可以在列表中添加 `{"title": "文档", "type": "link", "url": "https://docs.olivos.run/"}`，在新标签页打开外部网站。外部链接不会获得内嵌插件页面的消息桥接能力。
+
+**注册多个路径时，在 `webui_config` 中添加多个条目，每个条目各写一个 `path`。** 单个 `path` 不支持数组，也不能用逗号拼接多个路径。例如：
+
+```json
+{
+    "webui_config": [
+        {
+            "title": "插件首页",
+            "type": "iframe",
+            "path": "webui/index.html"
+        },
+        {
+            "title": "插件设置",
+            "type": "iframe",
+            "path": "webui/settings/index.html"
+        },
+        {
+            "title": "独立面板",
+            "type": "iframe",
+            "path": "panel.html"
+        }
+    ]
+}
+```
+
+以上配置会在侧栏添加三个页面入口。资源范围取所有入口的并集：此例包含整个 `webui/` 目录及根目录下的 `panel.html`；`webui/settings/` 已包含在 `webui/` 中。页面用到的静态资源无需逐个注册为页面，但必须在这些资源范围内。
 
 宿主从插件元数据补全 `namespace`，页面无需自行填写。修改 `app.json` 后需重载插件。已有的 `path: "webui/index.html"` 可直接使用，无需新增配置字段或编写资源恢复代码。
 
