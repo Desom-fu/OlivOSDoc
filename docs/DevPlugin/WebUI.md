@@ -171,13 +171,24 @@ HTML 中需有对应的输出节点，例如 `<output id="reply"></output>`。�
 - **被切走（隐藏）的页面仍在后台运行**，定时器与轮询不会自行停止。宿主会向页面发送可见性通知，页面应据此暂停后台工作：
 
 ````js
+// 声明状态：即使是普通脚本也要显式声明，模块或严格模式下未声明赋值会抛 ReferenceError
+let visible = true;
+
+// 让轮询循环真正观察这个状态，而不是只改一个变量
+setInterval(() => {
+    if (!visible) return;          // 页面在后台时跳过这一轮
+    sendRequest('state', { bot_hash: botHash });
+}, 5000);
+
 window.addEventListener('message', (event) => {
     if (event.source !== window.parent) return;
     const data = event.data;
     if (!data || data.type !== 'olivos:plugin_visibility') return;
-    polling = data.visible;   // false 时暂停轮询，true 时恢复
+    visible = data.visible;        // false 时暂停轮询，true 时恢复
 });
 ````
+
+关键点是第二段：通知本身只改变状态，**必须由轮询循环去读取它**才会真正停发请求。若定时器已经跑起来，也可以在收到通知时 `clearInterval` / 重新 `setInterval`，效果相同。
 
 不处理这条通知也能正常工作，但页面在后台会继续按原节奏发请求，容易造成不必要的平台调用与日志噪音。新建页面加载完成时宿主也会补发一次，因此页面无需自己猜测初始可见性。
 
